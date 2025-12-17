@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Feegow Monitor - V15.1 (Ghost Mode & Red Alert)
+// @name         Feegow Monitor - V16.0 (Smart Ghost Mode)
 // @namespace    http://tampermonkey.net/
-// @version      15.1
-// @description  Verifica senhas de forma 100% invisível (off-screen), alerta em VERMELHO e ignora repetidos.
+// @version      16.0
+// @description  Verifica senhas invisivelmente, mas PERMITE que o usuário abra o modal manualmente sem bugar a tela.
 // @match        https://app.feegow.com/*
 // @match        https://app.feegow.com/*/*
 // @grant        none
@@ -19,37 +19,37 @@
 
     // Lista para guardar IDs já vistos
     let listaIgnorados = new Set();
+    
+    // Nome da classe que indica que o ROBÔ está mexendo (não você)
+    const CLASSE_ROBO = 'feegow-robot-active';
 
-    // --- ESTILOS DO MODO SILENCIOSO (CORRIGIDO) ---
+    // --- ESTILOS DO MODO FANTASMA (Só ativam com a classe específica) ---
     const styleSilent = document.createElement('style');
     styleSilent.innerHTML = `
-        /* MATA O FUNDO ESCURO (BACKDROP) */
-        body.feegow-silent-check .modal-backdrop,
-        body.feegow-silent-check .modal-backdrop.in,
-        body.feegow-silent-check .modal-backdrop.show {
-            display: none !important;
+        /* Só esconde o fundo se for o robô mexendo */
+        body.${CLASSE_ROBO} .modal-backdrop,
+        body.${CLASSE_ROBO} .modal-backdrop.in,
+        body.${CLASSE_ROBO} .modal-backdrop.show {
             opacity: 0 !important;
             visibility: hidden !important;
+            display: none !important;
         }
 
-        /* JOGA O MODAL PARA FORA DA TELA E TORNA INVISÍVEL */
-        body.feegow-silent-check .modal {
+        /* Só joga o modal para o limbo se for o robô mexendo */
+        body.${CLASSE_ROBO} .modal {
             opacity: 0 !important;
-            /* Mantém display block para o texto existir no DOM, mas joga para o limbo */
             display: block !important;
             position: fixed !important;
-            top: -10000px !important;  /* Joga 10 mil pixels pra cima */
-            left: -10000px !important; /* Joga 10 mil pixels pra esquerda */
+            top: -10000px !important;  /* Joga pra longe */
+            left: -10000px !important;
             pointer-events: none !important;
-            transition: none !important;
-            animation: none !important;
             z-index: -9999 !important;
         }
 
-        /* Garante que a barra de rolagem da página principal continue funcionando */
-        body.feegow-silent-check {
+        /* Mantém scroll funcionando */
+        body.${CLASSE_ROBO} {
             overflow: auto !important;
-            padding-right: 0 !important; /* Evita o 'pulo' da barra de rolagem */
+            padding-right: 0 !important;
         }
     `;
     document.head.appendChild(styleSilent);
@@ -109,7 +109,9 @@
     }
 
     function fecharModal() {
-        document.body.classList.remove('feegow-silent-check');
+        // SEGURANÇA: Remove a classe do robô para devolver o controle ao usuário
+        document.body.classList.remove(CLASSE_ROBO);
+
         // Tenta clicar no X ou no botão fechar
         const btnClose = document.querySelector('.modal .close') || document.querySelector('button[data-dismiss="modal"]');
         if (btnClose) btnClose.click();
@@ -117,18 +119,19 @@
         // Garante fechamento forçado via ESC
         document.body.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape', 'keyCode': 27, 'bubbles': true}));
         
-        // Limpeza extra caso o modal tenha deixado sujeira no DOM
+        // Limpeza de lixo do Bootstrap
         const backdrops = document.querySelectorAll('.modal-backdrop');
         backdrops.forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
     }
 
     function verificarConteudoModal() {
         // Tenta pegar o corpo do modal
         const modalBody = document.querySelector('.modal-body') || document.querySelector('.modal-content');
 
-        // Se não achou modal nenhum, remove a classe silenciosa e sai
+        // Se não achou modal, garante que a classe do robô sai e aborta
         if (!modalBody) {
-            document.body.classList.remove('feegow-silent-check');
+            document.body.classList.remove(CLASSE_ROBO);
             return;
         }
 
@@ -154,7 +157,7 @@
             }
         }
 
-        fecharModal();
+        fecharModal(); // Fecha e remove a classe do robô
 
         if (encontrou) {
             mostrarAlertaNeon(termoAchado, assinaturaUnica);
@@ -168,20 +171,25 @@
         const btn = getElementByXPath("//button[contains(@class, 'callTicketBtn')]");
 
         if (btn) {
-            // Ativa o modo furtivo ANTES de clicar
-            document.body.classList.add('feegow-silent-check');
+            // 1. ATIVA O MODO ROBÔ (Esconde tudo)
+            document.body.classList.add(CLASSE_ROBO);
+            
+            // 2. Clica
             btn.click();
+            
+            // 3. Espera carregar, verifica e LIMPA a classe
             setTimeout(verificarConteudoModal, TEMPO_ESPERA_MODAL);
         } else {
-            // Se não achou botão, garante que o modo furtivo esteja desligado
-            document.body.classList.remove('feegow-silent-check');
+            // Se não achou botão, garante que a classe não esteja travando a tela
+            document.body.classList.remove(CLASSE_ROBO);
         }
     }
 
     // --- INICIALIZAÇÃO ---
     setTimeout(() => {
-        console.log("Feegow Monitor V15.1 (Ghost Mode) Ativo.");
+        console.log("Feegow Monitor V16.0 (Smart Ghost Mode) Ativo.");
         
+        // Indicador visual discreto (ponto vermelho no canto)
         const dot = document.createElement('div');
         dot.style.cssText = "position:fixed; bottom:2px; right:2px; width:4px; height:4px; background:#ff0000; z-index:999999; border-radius:50%; box-shadow: 0 0 5px #ff0000;";
         document.body.appendChild(dot);
