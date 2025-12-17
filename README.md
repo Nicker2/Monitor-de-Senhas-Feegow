@@ -65,7 +65,9 @@ const TERMOS_ALVO = [
     "OUTRAS ESPECIALIDADES",
     "TRIAGEM" // Exemplo: Adicionando novo termo
 ];
-```javascript
+
+```
+
 
 ## 📦 Instalação
 
